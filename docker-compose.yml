@@ -1,0 +1,70 @@
+version: "3.8"
+
+services:
+  database:
+    image: postgres:16-alpine
+    container_name: pern-store-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-newpassword}
+      - POSTGRES_DB=${POSTGRES_DB:-pernstore}
+    ports:
+      - "5432:5432"
+    volumes:
+      - db_data:/var/lib/postgresql/data
+      - ./server/config/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    networks:
+      - pernstore
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-postgres}"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+  server:
+    build:
+      context: ./server
+      dockerfile: Dockerfile
+    image: pern-store-server
+    container_name: pern-store-server
+    restart: unless-stopped
+    env_file:
+      - ./server/.env
+    environment:
+      - POSTGRES_HOST=database
+      - POSTGRES_PORT=5432
+      - POSTGRES_DB=${POSTGRES_DB:-pernstore}
+      - POSTGRES_USER=${POSTGRES_USER:-postgres}
+      - POSTGRES_PASSWORD=${POSTGRES_PASSWORD:-newpassword}
+    ports:
+      - "9000:9000"
+    depends_on:
+      database:
+        condition: service_healthy
+    networks:
+      - pernstore
+
+  client:
+    build:
+      context: ./client
+      dockerfile: Dockerfile
+    image: pern-store-client
+    container_name: pern-store-client
+    restart: unless-stopped
+    env_file:
+      - ./client/.env
+    ports:
+      - "3001:3000"
+    depends_on:
+      - server
+    networks:
+      - pernstore
+
+networks:
+  pernstore:
+    driver: bridge
+
+volumes:
+  db_data:
+    driver: local
