@@ -1,0 +1,66 @@
+name: CI/CD PERN Store - EKS
+
+on:
+  push:
+    branches: [ main ]
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: us-east-1
+  ECR_REPO_SERVER: pern-store-server
+  EKS_CLUSTER_NAME: pern-store-cluster
+  IMAGE_TAG: ${{ github.sha }}
+
+jobs:
+  build-and-push:
+    name: Build & Push a ECR
+    runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ env.IMAGE_TAG }}
+      registry: ${{ steps.ecr-login.outputs.registry }}
+    steps:
+      - name: Checkout código
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Login en Amazon ECR
+        id: ecr-login
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Build & Push imagen backend
+        working-directory: ./server
+        run: |
+          docker build -t ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO_SERVER }}:${{ env.IMAGE_TAG }} .
+          docker push ${{ steps.ecr-login.outputs.registry }}/${{ env.ECR_REPO_SERVER }}:${{ env.IMAGE_TAG }}
+
+  deploy:
+    name: Deploy a EKS
+    needs: build-and-push
+    runs-on: ubuntu-latest
+    steps:
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-session-token: ${{ secrets.AWS_SESSION_TOKEN }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Actualizar kubeconfig
+        run: aws eks update-kubeconfig --name ${{ env.EKS_CLUSTER_NAME }} --region ${{ env.AWS_REGION }}
+
+      - name: Actualizar imagen del backend
+        run: |
+          kubectl set image deployment/server-deployment \
+            server=${{ needs.build-and-push.outputs.registry }}/${{ env.ECR_REPO_SERVER }}:${{ needs.build-and-push.outputs.image_tag }} \
+            -n pern-store
+
+      - name: Verificar rollout
+        run: kubectl rollout status deployment/server-deployment -n pern-store
