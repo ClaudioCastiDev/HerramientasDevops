@@ -10,4 +10,4 @@ COPY --from=build /usr/src/app/node_modules ./node_modules
 COPY . .
 USER app
 EXPOSE 9000
-CMD ["npm", "start"]
+CMD ["node", "index"]

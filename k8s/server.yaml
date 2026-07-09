@@ -1,0 +1,72 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: server-deployment
+  namespace: pern-store
+spec:
+  replicas: 2
+  selector:
+    matchLabels:
+      app: server
+  template:
+    metadata:
+      labels:
+        app: server
+    spec:
+      containers:
+        - name: server
+          image: 775791070082.dkr.ecr.us-east-1.amazonaws.com/pern-store-server:v2
+          ports:
+            - containerPort: 9000
+          envFrom:
+            - secretRef:
+                name: pern-store-secrets
+          env:
+            - name: POSTGRES_HOST
+              value: database
+            - name: POSTGRES_PORT
+              value: "5432"
+            - name: PORT
+              value: "9000"
+            - name: NODE_ENV
+              value: "docker"
+          resources:
+            requests:
+              cpu: "150m"
+              memory: "128Mi"
+            limits:
+              cpu: "300m"
+              memory: "256Mi"
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: server
+  namespace: pern-store
+spec:
+  type: LoadBalancer
+  selector:
+    app: server
+  ports:
+    - port: 9000
+      targetPort: 9000
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: server-hpa
+  namespace: pern-store
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: server-deployment
+  minReplicas: 2
+  maxReplicas: 6
+  metrics:
+    - type: Resource
+      resource:
+        name: cpu
+        target:
+          type: Utilization
+          averageUtilization: 60

@@ -1,0 +1,41 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: database-deployment
+  namespace: pern-store
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: database
+  template:
+    metadata:
+      labels:
+        app: database
+    spec:
+      containers:
+        - name: database
+          image: postgres:16-alpine
+          ports:
+            - containerPort: 5432
+          envFrom:
+            - secretRef:
+                name: pern-store-secrets
+          volumeMounts:
+            - name: db-storage
+              mountPath: /var/lib/postgresql/data
+      volumes:
+        - name: db-storage
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: database
+  namespace: pern-store
+spec:
+  selector:
+    app: database
+  ports:
+    - port: 5432
+      targetPort: 5432
