@@ -86,6 +86,6 @@ Este proyecto se desarrolló sobre un entorno de laboratorio académico con rest
 
 React · Vite · Node.js · Express · PostgreSQL · Docker · Amazon EKS · Amazon ECR · GitHub Actions · AWS VPC
 
-## Autores
+## Autor
 
-Claudio Castillo y Dwaith Lopez — Evaluación Final Transversal, Introducción a Herramientas DevOps
+Claudio Castillo — Evaluación Final Transversal, Introducción a Herramientas DevOps
